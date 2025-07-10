@@ -1,0 +1,2 @@
+- name: Airflow DAGs Validation
+  uses: jayamanikharyono/airflow-dag-action@v2.5
