@@ -20,7 +20,7 @@ default_args = {
 dag = DAG(
     'xcom_example_dag',
     default_args=default_args,
-    schedule_interval=None,
+    schedule=None,
     catchup=False,
     tags=["learning", "xcom"]
 )
@@ -28,13 +28,11 @@ dag = DAG(
 push_task = PythonOperator(
     task_id='push_task',
     python_callable=push_xcom,
-    provide_context=True,
     dag=dag
 )
 pull_task = PythonOperator(
     task_id='pull_task',
     python_callable=pull_xcom,
-    provide_context=True,
     dag=dag
 )
 

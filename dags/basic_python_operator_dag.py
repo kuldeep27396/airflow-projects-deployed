@@ -19,7 +19,7 @@ default_args = {
 dag = DAG(
     'basic_python_operator_dag',
     default_args=default_args,
-    schedule_interval=None,
+    schedule=None,
     catchup=False,
     tags=["learning", "basic"]
 )
