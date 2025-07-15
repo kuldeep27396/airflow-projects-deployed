@@ -332,7 +332,7 @@ api_failure_task = PythonOperator(
     task_id='external_api_failure',
     python_callable=simulate_external_api_failure,
     retries=5,
-    retry_delay=retry_delay_function,  # Custom retry delay function
+    retry_delay=timedelta(seconds=30),  # Fixed retry delay
     dag=dag
 )
 

@@ -428,86 +428,80 @@ default_args = {
     'retry_delay': timedelta(minutes=1),
 }
 
-dag = DAG(
+with DAG(
     'data_pipeline_etl_dag',
     default_args=default_args,
     schedule='@daily',
     catchup=False,
     tags=["learning", "etl", "data-pipeline", "advanced"]
-)
+) as dag:
 
-# Setup task
-setup_task = PythonOperator(
-    task_id='create_sample_data_sources',
-    python_callable=create_sample_data_sources,
-    dag=dag
-)
-
-# Extract TaskGroup
-with TaskGroup("extract_data", dag=dag) as extract_group:
-    extract_csv_task = PythonOperator(
-        task_id='extract_csv_data',
-        python_callable=extract_csv_data,
-    )
-    
-    extract_json_task = PythonOperator(
-        task_id='extract_json_data',
-        python_callable=extract_json_data,
-    )
-    
-    extract_api_task = PythonOperator(
-        task_id='extract_api_data',
-        python_callable=extract_api_data,
+    # Setup task
+    setup_task = PythonOperator(
+        task_id='create_sample_data_sources',
+        python_callable=create_sample_data_sources,
     )
 
-# Validation task
-validate_task = PythonOperator(
-    task_id='validate_extracted_data',
-    python_callable=validate_extracted_data,
-    dag=dag
-)
+    # Extract TaskGroup
+    with TaskGroup("extract_data") as extract_group:
+        extract_csv_task = PythonOperator(
+            task_id='extract_csv_data',
+            python_callable=extract_csv_data,
+        )
+        
+        extract_json_task = PythonOperator(
+            task_id='extract_json_data',
+            python_callable=extract_json_data,
+        )
+        
+        extract_api_task = PythonOperator(
+            task_id='extract_api_data',
+            python_callable=extract_api_data,
+        )
 
-# Transform TaskGroup
-with TaskGroup("transform_data", dag=dag) as transform_group:
-    clean_task = PythonOperator(
-        task_id='clean_and_standardize_data',
-        python_callable=clean_and_standardize_data,
+    # Validation task
+    validate_task = PythonOperator(
+        task_id='validate_extracted_data',
+        python_callable=validate_extracted_data,
     )
-    
-    transform_task = PythonOperator(
-        task_id='transform_and_enrich_data',
-        python_callable=transform_and_enrich_data,
+
+    # Transform TaskGroup
+    with TaskGroup("transform_data") as transform_group:
+        clean_task = PythonOperator(
+            task_id='clean_and_standardize_data',
+            python_callable=clean_and_standardize_data,
+        )
+        
+        transform_task = PythonOperator(
+            task_id='transform_and_enrich_data',
+            python_callable=transform_and_enrich_data,
+        )
+        
+        clean_task >> transform_task
+
+    # Data marts creation
+    create_marts_task = PythonOperator(
+        task_id='create_data_marts',
+        python_callable=create_data_marts,
     )
-    
-    clean_task >> transform_task
 
-# Data marts creation
-create_marts_task = PythonOperator(
-    task_id='create_data_marts',
-    python_callable=create_data_marts,
-    dag=dag
-)
+    # Quality and loading tasks
+    quality_report_task = PythonOperator(
+        task_id='generate_data_quality_report',
+        python_callable=generate_data_quality_report,
+    )
 
-# Quality and loading tasks
-quality_report_task = PythonOperator(
-    task_id='generate_data_quality_report',
-    python_callable=generate_data_quality_report,
-    dag=dag
-)
+    load_task = PythonOperator(
+        task_id='simulate_data_loading',
+        python_callable=simulate_data_loading,
+    )
 
-load_task = PythonOperator(
-    task_id='simulate_data_loading',
-    python_callable=simulate_data_loading,
-    dag=dag
-)
+    # Cleanup task
+    cleanup_task = PythonOperator(
+        task_id='cleanup_etl_files',
+        python_callable=cleanup_etl_files,
+    )
 
-# Cleanup task
-cleanup_task = PythonOperator(
-    task_id='cleanup_etl_files',
-    python_callable=cleanup_etl_files,
-    dag=dag
-)
-
-# Define dependencies
-setup_task >> extract_group >> validate_task >> transform_group
-transform_group >> create_marts_task >> quality_report_task >> load_task >> cleanup_task
+    # Define dependencies
+    setup_task >> extract_group >> validate_task >> transform_group
+    transform_group >> create_marts_task >> quality_report_task >> load_task >> cleanup_task

@@ -15,7 +15,7 @@ from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.utils.task_group import TaskGroup
-from airflow.utils.dates import days_ago
+# from airflow.utils.dates import days_ago  # Deprecated in newer versions
 from airflow.models import Variable
 from datetime import datetime, timedelta
 import json
@@ -391,66 +391,63 @@ default_args = {
     'retry_delay': timedelta(minutes=1),
 }
 
-dag = DAG(
+with DAG(
     'production_patterns_dag',
     default_args=default_args,
     schedule='@daily',
     catchup=False,
     tags=["interview", "production", "patterns", "monitoring"]
-)
+) as dag:
 
-# Start
-start = EmptyOperator(task_id='start', dag=dag)
+    # Start
+    start = EmptyOperator(task_id='start')
 
-# Data Quality Group
-with TaskGroup("data_quality_group", dag=dag) as quality_group:
-    quality_check = PythonOperator(
-        task_id='data_quality_check',
-        python_callable=data_quality_check,
+    # Data Quality Group
+    with TaskGroup("data_quality_group") as quality_group:
+        quality_check = PythonOperator(
+            task_id='data_quality_check',
+            python_callable=data_quality_check,
+        )
+        
+        testing_task = PythonOperator(
+            task_id='testing_validation',
+            python_callable=testing_validation,
+        )
+        
+        quality_check >> testing_task
+
+    # Performance Monitoring Group
+    with TaskGroup("performance_group") as performance_group:
+        performance_task = PythonOperator(
+            task_id='performance_monitoring',
+            python_callable=performance_monitoring,
+        )
+        
+        optimization_task = PythonOperator(
+            task_id='resource_optimization',
+            python_callable=resource_optimization,
+        )
+        
+        performance_task >> optimization_task
+
+    # Operational Monitoring
+    operational_task = PythonOperator(
+        task_id='operational_monitoring',
+        python_callable=operational_monitoring,
     )
-    
-    testing_task = PythonOperator(
-        task_id='testing_validation',
-        python_callable=testing_validation,
+
+    # Alerting and Notifications
+    alerting_task = PythonOperator(
+        task_id='alerting_notification',
+        python_callable=alerting_notification,
     )
-    
-    quality_check >> testing_task
 
-# Performance Monitoring Group
-with TaskGroup("performance_group", dag=dag) as performance_group:
-    performance_task = PythonOperator(
-        task_id='performance_monitoring',
-        python_callable=performance_monitoring,
+    # Cleanup
+    cleanup_task = PythonOperator(
+        task_id='cleanup_production_files',
+        python_callable=cleanup_production_files,
     )
-    
-    optimization_task = PythonOperator(
-        task_id='resource_optimization',
-        python_callable=resource_optimization,
-    )
-    
-    performance_task >> optimization_task
 
-# Operational Monitoring
-operational_task = PythonOperator(
-    task_id='operational_monitoring',
-    python_callable=operational_monitoring,
-    dag=dag
-)
-
-# Alerting and Notifications
-alerting_task = PythonOperator(
-    task_id='alerting_notification',
-    python_callable=alerting_notification,
-    dag=dag
-)
-
-# Cleanup
-cleanup_task = PythonOperator(
-    task_id='cleanup_production_files',
-    python_callable=cleanup_production_files,
-    dag=dag
-)
-
-# Dependencies
-start >> [quality_group, performance_group, operational_task]
-[quality_group, performance_group, operational_task] >> alerting_task >> cleanup_task
+    # Dependencies
+    start >> [quality_group, performance_group, operational_task]
+    [quality_group, performance_group, operational_task] >> alerting_task >> cleanup_task

@@ -444,5 +444,16 @@ summary_task = PythonOperator(
 
 # Dependencies
 start >> [docker_task, kubernetes_task]
-[docker_task, kubernetes_task] >> [networking_task, security_task, volume_task, monitoring_task]
+
+# Individual dependencies to avoid list >> list issue
+docker_task >> networking_task
+docker_task >> security_task
+docker_task >> volume_task
+docker_task >> monitoring_task
+
+kubernetes_task >> networking_task
+kubernetes_task >> security_task
+kubernetes_task >> volume_task
+kubernetes_task >> monitoring_task
+
 [networking_task, security_task, volume_task, monitoring_task] >> summary_task

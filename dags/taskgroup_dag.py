@@ -42,118 +42,116 @@ default_args = {
     'retry_delay': timedelta(minutes=2),
 }
 
-dag = DAG(
+with DAG(
     'taskgroup_example_dag',
     default_args=default_args,
     schedule=None,
     catchup=False,
     tags=["learning", "taskgroup", "intermediate"]
-)
+) as dag:
 
-# Start task
-start_task = BashOperator(
-    task_id='start_pipeline',
-    bash_command='echo "Starting ETL Pipeline with TaskGroups"',
-    dag=dag
-)
-
-# Extract TaskGroup
-with TaskGroup("extract_group", dag=dag) as extract_group:
-    extract_db = PythonOperator(
-        task_id='extract_from_database',
-        python_callable=extract_data,
-        op_kwargs={'source': 'database'},
-    )
-    
-    extract_api = PythonOperator(
-        task_id='extract_from_api',
-        python_callable=extract_data,
-        op_kwargs={'source': 'api'},
-    )
-    
-    extract_files = PythonOperator(
-        task_id='extract_from_files',
-        python_callable=extract_data,
-        op_kwargs={'source': 'files'},
+    # Start task
+    start_task = BashOperator(
+        task_id='start_pipeline',
+        bash_command='echo "Starting ETL Pipeline with TaskGroups"',
     )
 
-# Transform TaskGroup
-with TaskGroup("transform_group", dag=dag) as transform_group:
-    transform_customer_data = PythonOperator(
-        task_id='transform_customer_data',
-        python_callable=transform_data,
-        op_kwargs={'data_type': 'customer'},
-    )
-    
-    transform_product_data = PythonOperator(
-        task_id='transform_product_data',
-        python_callable=transform_data,
-        op_kwargs={'data_type': 'product'},
-    )
-    
-    transform_order_data = PythonOperator(
-        task_id='transform_order_data',
-        python_callable=transform_data,
-        op_kwargs={'data_type': 'order'},
-    )
+    # Extract TaskGroup
+    with TaskGroup("extract_group") as extract_group:
+        extract_db = PythonOperator(
+            task_id='extract_from_database',
+            python_callable=extract_data,
+            op_kwargs={'source': 'database'},
+        )
+        
+        extract_api = PythonOperator(
+            task_id='extract_from_api',
+            python_callable=extract_data,
+            op_kwargs={'source': 'api'},
+        )
+        
+        extract_files = PythonOperator(
+            task_id='extract_from_files',
+            python_callable=extract_data,
+            op_kwargs={'source': 'files'},
+        )
 
-# Load TaskGroup with nested validation
-with TaskGroup("load_group", dag=dag) as load_group:
-    # Nested TaskGroup for data warehouse operations
-    with TaskGroup("data_warehouse", dag=dag) as dw_group:
-        load_to_staging = PythonOperator(
-            task_id='load_to_staging',
+    # Transform TaskGroup
+    with TaskGroup("transform_group") as transform_group:
+        transform_customer_data = PythonOperator(
+            task_id='transform_customer_data',
+            python_callable=transform_data,
+            op_kwargs={'data_type': 'customer'},
+        )
+        
+        transform_product_data = PythonOperator(
+            task_id='transform_product_data',
+            python_callable=transform_data,
+            op_kwargs={'data_type': 'product'},
+        )
+        
+        transform_order_data = PythonOperator(
+            task_id='transform_order_data',
+            python_callable=transform_data,
+            op_kwargs={'data_type': 'order'},
+        )
+
+    # Load TaskGroup with nested validation
+    with TaskGroup("load_group") as load_group:
+        # Nested TaskGroup for data warehouse operations
+        with TaskGroup("data_warehouse") as dw_group:
+            load_to_staging = PythonOperator(
+                task_id='load_to_staging',
+                python_callable=load_data,
+                op_kwargs={'destination': 'staging'},
+            )
+            
+            validate_staging = PythonOperator(
+                task_id='validate_staging',
+                python_callable=validate_data,
+                op_kwargs={'dataset': 'staging'},
+            )
+            
+            load_to_production = PythonOperator(
+                task_id='load_to_production',
+                python_callable=load_data,
+                op_kwargs={'destination': 'production'},
+            )
+            
+            load_to_staging >> validate_staging >> load_to_production
+        
+        # Parallel analytics load
+        load_to_analytics = PythonOperator(
+            task_id='load_to_analytics',
             python_callable=load_data,
-            op_kwargs={'destination': 'staging'},
+            op_kwargs={'destination': 'analytics'},
+        )
+
+    # Notification TaskGroup
+    with TaskGroup("notification_group") as notification_group:
+        send_success_email = PythonOperator(
+            task_id='send_success_email',
+            python_callable=send_notification,
+            op_kwargs={'message': 'ETL Pipeline completed successfully'},
         )
         
-        validate_staging = PythonOperator(
-            task_id='validate_staging',
-            python_callable=validate_data,
-            op_kwargs={'dataset': 'staging'},
+        send_slack_message = PythonOperator(
+            task_id='send_slack_message',
+            python_callable=send_notification,
+            op_kwargs={'message': 'Data pipeline finished - check analytics dashboard'},
         )
         
-        load_to_production = PythonOperator(
-            task_id='load_to_production',
-            python_callable=load_data,
-            op_kwargs={'destination': 'production'},
+        update_monitoring = PythonOperator(
+            task_id='update_monitoring',
+            python_callable=send_notification,
+            op_kwargs={'message': 'Pipeline metrics updated'},
         )
-        
-        load_to_staging >> validate_staging >> load_to_production
-    
-    # Parallel analytics load
-    load_to_analytics = PythonOperator(
-        task_id='load_to_analytics',
-        python_callable=load_data,
-        op_kwargs={'destination': 'analytics'},
+
+    # End task
+    end_task = BashOperator(
+        task_id='end_pipeline',
+        bash_command='echo "ETL Pipeline completed successfully"',
     )
 
-# Notification TaskGroup
-with TaskGroup("notification_group", dag=dag) as notification_group:
-    send_success_email = PythonOperator(
-        task_id='send_success_email',
-        python_callable=send_notification,
-        op_kwargs={'message': 'ETL Pipeline completed successfully'},
-    )
-    
-    send_slack_message = PythonOperator(
-        task_id='send_slack_message',
-        python_callable=send_notification,
-        op_kwargs={'message': 'Data pipeline finished - check analytics dashboard'},
-    )
-    
-    update_monitoring = PythonOperator(
-        task_id='update_monitoring',
-        python_callable=send_notification,
-        op_kwargs={'message': 'Pipeline metrics updated'},
-    )
-
-# End task
-end_task = BashOperator(
-    task_id='end_pipeline',
-    bash_command='echo "ETL Pipeline completed successfully"',
-    dag=dag
-)
-
-# Define dependencies between TaskGroups
-start_task >> extract_group >> transform_group >> load_group >> notification_group >> end_task
+    # Define dependencies between TaskGroups
+    start_task >> extract_group >> transform_group >> load_group >> notification_group >> end_task
