@@ -552,9 +552,206 @@ validate_data = DataValidationOperator(
 
 ---
 
+## Cloud Services DAGs
+
+### 13. Google Cloud Dataproc DAG
+**File:** [google_cloud_dataproc_dag.py](https://github.com/kuldeep735/astro-project-deployed/blob/main/dags/google_cloud_dataproc_dag.py)
+
+**Purpose:** Demonstrates Apache Airflow integration with Google Cloud Dataproc for running Spark and Hadoop jobs
+
+**Key Concepts:**
+- **Dataproc Cluster Management**: Create and destroy ephemeral clusters
+- **Spark Job Submission**: Submit PySpark jobs to Dataproc
+- **Hadoop Job Execution**: Run MapReduce jobs
+- **Cost Optimization**: Ephemeral clusters and spot instances
+- **Cloud Storage Integration**: Data input/output from GCS
+
+**Code Analysis:**
+```python
+def create_dataproc_cluster():
+    cluster_config = {
+        "project_id": "your-gcp-project-id",
+        "cluster_name": "airflow-dataproc-cluster",
+        "num_masters": 1,
+        "num_workers": 2,
+        "initialization_actions": ["gs://bucket/install-deps.sh"],
+        "properties": {
+            "spark:spark.sql.adaptive.enabled": "true"
+        }
+    }
+    return cluster_config
+
+def submit_spark_job():
+    spark_job_config = {
+        "pyspark_job": {
+            "main_python_file_uri": "gs://bucket/spark-jobs/process.py",
+            "args": ["--input-path", "gs://bucket/input/"],
+            "properties": {
+                "spark.executor.memory": "4g",
+                "spark.executor.cores": "2"
+            }
+        }
+    }
+    return spark_job_config
+```
+
+**Operators Used:**
+- `PythonOperator` (mock implementation)
+- `BashOperator`
+- `EmptyOperator`
+
+**Production Operators:**
+- `DataprocCreateClusterOperator`
+- `DataprocSubmitJobOperator`
+- `DataprocDeleteClusterOperator`
+
+**Interview Points:**
+- Big data processing with managed services
+- Spark job optimization and configuration
+- Cost management with ephemeral clusters
+- Data pipeline orchestration in cloud environments
+
+---
+
+### 14. AWS EMR DAG
+**File:** [aws_emr_dag.py](https://github.com/kuldeep735/astro-project-deployed/blob/main/dags/aws_emr_dag.py)
+
+**Purpose:** Demonstrates Apache Airflow integration with AWS EMR for big data processing
+
+**Key Concepts:**
+- **EMR Cluster Lifecycle**: Create, configure, and terminate clusters
+- **Spot Instances**: Cost optimization with EC2 spot instances
+- **Bootstrap Actions**: Custom cluster initialization
+- **S3 Integration**: Data storage and retrieval
+- **Multi-step Processing**: Spark and Hadoop job coordination
+
+**Code Analysis:**
+```python
+def create_emr_cluster():
+    cluster_config = {
+        "Name": "airflow-emr-cluster",
+        "ReleaseLabel": "emr-6.4.0",
+        "Applications": [{"Name": "Spark"}, {"Name": "Hadoop"}],
+        "Instances": {
+            "InstanceGroups": [
+                {
+                    "Name": "Core",
+                    "Market": "SPOT",
+                    "InstanceType": "m5.large",
+                    "InstanceCount": 2,
+                    "BidPrice": "0.10"
+                }
+            ]
+        },
+        "LogUri": "s3://your-bucket/emr-logs/"
+    }
+    return cluster_config
+
+def submit_spark_step():
+    spark_step = {
+        "Name": "Data Processing with Spark",
+        "HadoopJarStep": {
+            "Jar": "command-runner.jar",
+            "Args": [
+                "spark-submit",
+                "--deploy-mode", "cluster",
+                "s3://bucket/spark-jobs/process.py"
+            ]
+        }
+    }
+    return spark_step
+```
+
+**Operators Used:**
+- `PythonOperator` (mock implementation)
+- `BashOperator`
+- `EmptyOperator`
+
+**Production Operators:**
+- `EmrCreateJobFlowOperator`
+- `EmrAddStepsOperator`
+- `EmrTerminateJobFlowOperator`
+- `EmrJobFlowSensor`
+
+**Interview Points:**
+- AWS EMR vs Google Dataproc comparison
+- Spot instance cost optimization
+- Multi-step job coordination
+- S3 data lake integration
+
+---
+
+### 15. Google BigQuery DAG
+**File:** [google_bigquery_dag.py](https://github.com/kuldeep735/astro-project-deployed/blob/main/dags/google_bigquery_dag.py)
+
+**Purpose:** Demonstrates Apache Airflow integration with Google BigQuery for data warehousing
+
+**Key Concepts:**
+- **Dataset Management**: Create and configure BigQuery datasets
+- **Data Loading**: Load data from Cloud Storage to BigQuery
+- **SQL Transformations**: Complex analytical queries
+- **Data Quality**: Validation and monitoring
+- **Materialized Views**: Performance optimization
+
+**Code Analysis:**
+```python
+def run_data_transformation():
+    transformation_sql = """
+    CREATE OR REPLACE TABLE `project.dataset.customer_analytics` AS
+    WITH customer_metrics AS (
+        SELECT 
+            customer_id,
+            total_spend,
+            CASE 
+                WHEN total_spend > 1000 THEN 'High Value'
+                WHEN total_spend > 500 THEN 'Medium Value'
+                ELSE 'Low Value'
+            END as customer_segment,
+            AVG(total_spend) OVER (PARTITION BY country) as avg_country_spend
+        FROM `project.dataset.customers`
+    )
+    SELECT * FROM customer_metrics
+    """
+    return transformation_sql
+
+def run_data_quality_checks():
+    quality_checks = [
+        {
+            "check_name": "row_count_validation",
+            "sql": "SELECT COUNT(*) FROM table",
+            "expected_min": 1000
+        },
+        {
+            "check_name": "null_validation",
+            "sql": "SELECT COUNT(*) FROM table WHERE id IS NULL",
+            "expected_result": 0
+        }
+    ]
+    return quality_checks
+```
+
+**Operators Used:**
+- `PythonOperator` (mock implementation)
+- `BashOperator`
+- `EmptyOperator`
+
+**Production Operators:**
+- `BigQueryCreateDatasetOperator`
+- `BigQueryInsertJobOperator`
+- `BigQueryCheckOperator`
+- `BigQueryToCloudStorageOperator`
+
+**Interview Points:**
+- Data warehouse architecture patterns
+- SQL optimization for analytics
+- Cost monitoring and optimization
+- Data quality validation strategies
+
+---
+
 ## Production DAGs
 
-### 13. Kubernetes Docker DAG
+### 16. Kubernetes Docker DAG
 **File:** [kubernetes_docker_dag.py](https://github.com/kuldeep735/astro-project-deployed/blob/main/dags/kubernetes_docker_dag.py)
 
 **Purpose:** Container orchestration concepts
@@ -681,6 +878,13 @@ validate_data = DataValidationOperator(
 | **@dag (TaskFlow)** | Modern DAG creation | - Decorator syntax<br>- Automatic instantiation<br>- Cleaner code | - Modern DAG patterns<br>- Simplified syntax<br>- Best practices | ⭐⭐⭐⭐⭐ |
 | **Custom Operators** | Reusable components | - BaseOperator inheritance<br>- Template fields<br>- Business logic | - Domain-specific logic<br>- Reusability<br>- Maintainability | ⭐⭐⭐⭐⭐ |
 | **Custom Sensors** | Custom monitoring | - BaseSensorOperator<br>- Poke logic<br>- External systems | - External dependencies<br>- Custom conditions<br>- Integration | ⭐⭐⭐⭐ |
+| **DataprocCreateClusterOperator** | GCP Dataproc cluster creation | - Ephemeral clusters<br>- Spot instances<br>- Auto-scaling | - Big data processing<br>- Spark jobs<br>- Cost optimization | ⭐⭐⭐⭐⭐ |
+| **DataprocSubmitJobOperator** | Submit Spark/Hadoop jobs | - PySpark jobs<br>- JAR dependencies<br>- Job monitoring | - Data processing<br>- ETL pipelines<br>- Analytics | ⭐⭐⭐⭐⭐ |
+| **EmrCreateJobFlowOperator** | AWS EMR cluster creation | - Spot instances<br>- Bootstrap actions<br>- Multi-step jobs | - Big data processing<br>- Hadoop/Spark<br>- Cost optimization | ⭐⭐⭐⭐⭐ |
+| **EmrAddStepsOperator** | Submit EMR steps | - Step coordination<br>- JAR execution<br>- S3 integration | - Multi-step processing<br>- Data pipelines<br>- Job orchestration | ⭐⭐⭐⭐⭐ |
+| **BigQueryCreateDatasetOperator** | Create BigQuery datasets | - Dataset configuration<br>- Access controls<br>- Location settings | - Data warehouse setup<br>- Analytics preparation<br>- Data organization | ⭐⭐⭐⭐ |
+| **BigQueryInsertJobOperator** | Run BigQuery queries | - SQL execution<br>- Job monitoring<br>- Result handling | - Data transformation<br>- Analytics queries<br>- ETL processing | ⭐⭐⭐⭐⭐ |
+| **BigQueryCheckOperator** | Data quality validation | - SQL-based checks<br>- Threshold validation<br>- Quality metrics | - Data validation<br>- Quality assurance<br>- Monitoring | ⭐⭐⭐⭐ |
 
 ## Key Functions and Patterns
 
@@ -784,6 +988,13 @@ sensor = FileSensor(
 5. "Describe sensor vs operator differences"
 6. "How do you monitor production DAGs?"
 7. "What are TaskGroups and when to use them?"
+8. "How do you integrate Airflow with cloud services?"
+9. "Explain the difference between AWS EMR and Google Dataproc"
+10. "How do you optimize costs in cloud-based data pipelines?"
+11. "What are the best practices for BigQuery integration?"
+12. "How do you handle ephemeral cluster management?"
+13. "Explain data quality validation strategies"
+14. "How do you implement data lineage tracking?"
 
 ### Best Practices Demonstrated
 - Use TaskFlow API for modern workflows
